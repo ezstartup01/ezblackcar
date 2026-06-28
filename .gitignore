@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# Source design/export artifacts not needed for Vercel deploy
+ez_black_car_batch1/
+ez_black_car_batch2/
+ez_black_car_batch3/
+ez_black_car_icons/
+ez_black_car_svg_icons/
+Jsonfile/
+/*.zip
+/*.json
+/*.html
+/*.png
+
+!package.json
+!package-lock.json
+!index.html
+!public/**/*.png
