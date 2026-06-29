@@ -39,6 +39,17 @@ create table if not exists public.quote_requests (
   phone text,
   email text,
   airport_type text,
+  trip_type text,
+  pickup_type text,
+  pickup_airport text,
+  pickup_address text,
+  pickup_city text,
+  pickup_zip text,
+  destination_type text,
+  destination_airport text,
+  destination_address text,
+  destination_city text,
+  destination_zip text,
   passengers int,
   luggage_count int,
   flight_number text,
@@ -59,6 +70,17 @@ create table if not exists public.quote_requests (
 );
 
 alter table public.quote_requests add column if not exists email text;
+alter table public.quote_requests add column if not exists trip_type text;
+alter table public.quote_requests add column if not exists pickup_type text;
+alter table public.quote_requests add column if not exists pickup_airport text;
+alter table public.quote_requests add column if not exists pickup_address text;
+alter table public.quote_requests add column if not exists pickup_city text;
+alter table public.quote_requests add column if not exists pickup_zip text;
+alter table public.quote_requests add column if not exists destination_type text;
+alter table public.quote_requests add column if not exists destination_airport text;
+alter table public.quote_requests add column if not exists destination_address text;
+alter table public.quote_requests add column if not exists destination_city text;
+alter table public.quote_requests add column if not exists destination_zip text;
 alter table public.quote_requests add column if not exists matched_zone text;
 alter table public.quote_requests add column if not exists distance_miles numeric;
 alter table public.quote_requests add column if not exists duration_minutes int;

@@ -10,15 +10,31 @@ import {
   UserRound,
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
-import { calculateQuote, defaultQuoteRules, defaultQuoteZones } from "../lib/quoteEngine.js";
+import {
+  airportOptions,
+  buildDestinationLocation,
+  buildPickupLocation,
+  calculateQuote,
+  defaultQuoteRules,
+  defaultQuoteZones,
+} from "../lib/quoteEngine.js";
 
 const initialForm = {
   pickupDate: "",
   pickupTime: "",
-  pickupLocation: "",
-  destination: "",
+  pickupType: "address",
+  pickupAirport: "DTW",
+  pickupOtherAirport: "",
+  pickupAddress: "",
+  pickupCity: "",
+  pickupZip: "",
+  destinationType: "address",
+  destinationAirport: "DTW",
+  destinationOtherAirport: "",
+  destinationAddress: "",
+  destinationCity: "",
+  destinationZip: "",
   phone: "",
-  airportType: "",
   passengers: "",
   luggageCount: "",
   email: "",
@@ -51,6 +67,10 @@ function isShortNoticeRide(form) {
   return pickupDateTime.getTime() - Date.now() < shortNoticeHours * 60 * 60 * 1000;
 }
 
+function getDifferentAirport(currentAirport) {
+  return airportOptions.find((airport) => airport.value !== currentAirport)?.value || "OTHER";
+}
+
 export default function QuoteForm() {
   const [form, setForm] = useState(initialForm);
   const [status, setStatus] = useState({ tone: "", message: "" });
@@ -60,7 +80,24 @@ export default function QuoteForm() {
 
   function updateField(event) {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+    setForm((current) => {
+      const next = { ...current, [name]: value };
+
+      if (name === "pickupType" && value !== "airport") {
+        next.flightNumber = "";
+      }
+
+      if (
+        (name === "pickupType" || name === "pickupAirport" || name === "destinationType") &&
+        next.pickupType === "airport" &&
+        next.destinationType === "airport" &&
+        next.pickupAirport === next.destinationAirport
+      ) {
+        next.destinationAirport = getDifferentAirport(next.pickupAirport);
+      }
+
+      return next;
+    });
   }
 
   async function handleSubmit(event) {
@@ -95,18 +132,20 @@ export default function QuoteForm() {
       zoneRows?.length ? zoneRows : defaultQuoteZones,
       ruleRows?.[0] || defaultQuoteRules,
     );
+    const pickupLocation = quote.pickupLocation || buildPickupLocation(form);
+    const destination = quote.destination || buildDestinationLocation(form);
 
-    const quoteRequest = {
+    const baseQuoteRequest = {
       pickup_date: form.pickupDate,
       pickup_time: form.pickupTime,
-      pickup_location: form.pickupLocation,
-      destination: form.destination,
+      pickup_location: pickupLocation,
+      destination,
       phone: form.phone,
-      airport_type: form.airportType || null,
+      airport_type: quote.tripType,
       passengers: selectToNumber(form.passengers),
       luggage_count: selectToNumber(form.luggageCount),
       email: form.email || null,
-      flight_number: form.flightNumber || null,
+      flight_number: form.pickupType === "airport" ? form.flightNumber || null : null,
       matched_zone: quote.matchedZone,
       distance_miles: quote.distanceMiles,
       duration_minutes: quote.durationMinutes,
@@ -119,8 +158,26 @@ export default function QuoteForm() {
       quote_status: quote.quoteStatus,
       notes: quote.reviewReasons.length ? quote.reviewReasons.join(", ") : null,
     };
+    const structuredQuoteRequest = {
+      ...baseQuoteRequest,
+      trip_type: quote.tripType,
+      pickup_type: form.pickupType,
+      pickup_airport: form.pickupType === "airport" ? form.pickupAirport : null,
+      pickup_address: form.pickupType === "address" ? form.pickupAddress : null,
+      pickup_city: form.pickupType === "address" ? form.pickupCity : null,
+      pickup_zip: form.pickupType === "address" ? form.pickupZip : null,
+      destination_type: form.destinationType,
+      destination_airport: form.destinationType === "airport" ? form.destinationAirport : null,
+      destination_address: form.destinationType === "address" ? form.destinationAddress : null,
+      destination_city: form.destinationType === "address" ? form.destinationCity : null,
+      destination_zip: form.destinationType === "address" ? form.destinationZip : null,
+    };
 
-    const { error } = await supabase.from("quote_requests").insert(quoteRequest);
+    let { error } = await supabase.from("quote_requests").insert(structuredQuoteRequest);
+    if (error?.message?.includes("column")) {
+      const fallback = await supabase.from("quote_requests").insert(baseQuoteRequest);
+      error = fallback.error;
+    }
 
     setIsSubmitting(false);
 
@@ -146,8 +203,12 @@ export default function QuoteForm() {
   const fieldIcons = {
     pickupDate: CalendarDays,
     pickupTime: Clock3,
-    pickupLocation: MapPin,
-    destination: MapPin,
+    pickupAddress: MapPin,
+    pickupCity: MapPin,
+    pickupZip: MapPin,
+    destinationAddress: MapPin,
+    destinationCity: MapPin,
+    destinationZip: MapPin,
     phone: Phone,
     passengers: UserRound,
     luggageCount: BriefcaseBusiness,
@@ -200,47 +261,128 @@ export default function QuoteForm() {
             </div>
           </label>
           <label>
-            <span>Pickup Location</span>
-            <div className="field-shell">
-              <input
-                name="pickupLocation"
-                value={form.pickupLocation}
-                onChange={updateField}
-                placeholder="Enter pickup location"
-                required
-              />
-              <FieldIcon name="pickupLocation" />
+            <span>Pickup Type</span>
+            <div className="field-shell select-shell">
+              <select name="pickupType" value={form.pickupType} onChange={updateField}>
+                <option value="address">Address / Hotel / Office</option>
+                <option value="airport">Airport</option>
+              </select>
             </div>
           </label>
+          {form.pickupType === "airport" ? (
+            <>
+              <label>
+                <span>Pickup Airport</span>
+                <div className="field-shell select-shell">
+                  <select name="pickupAirport" value={form.pickupAirport} onChange={updateField}>
+                    {airportOptions.map((airport) => (
+                      <option key={airport.value} value={airport.value}>{airport.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </label>
+              {form.pickupAirport === "OTHER" && (
+                <label>
+                  <span>Pickup Airport Name</span>
+                  <div className="field-shell">
+                    <input name="pickupOtherAirport" value={form.pickupOtherAirport} onChange={updateField} placeholder="Airport name" required />
+                    <FieldIcon name="pickupAddress" />
+                  </div>
+                </label>
+              )}
+            </>
+          ) : (
+            <>
+              <label>
+                <span>Pickup Address</span>
+                <div className="field-shell">
+                  <input name="pickupAddress" value={form.pickupAddress} onChange={updateField} placeholder="Street address" required />
+                  <FieldIcon name="pickupAddress" />
+                </div>
+              </label>
+              <label>
+                <span>Pickup City</span>
+                <div className="field-shell">
+                  <input name="pickupCity" value={form.pickupCity} onChange={updateField} placeholder="City" required />
+                  <FieldIcon name="pickupCity" />
+                </div>
+              </label>
+              <label>
+                <span>Pickup ZIP</span>
+                <div className="field-shell">
+                  <input name="pickupZip" value={form.pickupZip} onChange={updateField} placeholder="ZIP code" inputMode="numeric" required />
+                  <FieldIcon name="pickupZip" />
+                </div>
+              </label>
+            </>
+          )}
           <label>
-            <span>Destination</span>
-            <div className="field-shell">
-              <input
-                name="destination"
-                value={form.destination}
-                onChange={updateField}
-                placeholder="Enter destination"
-                required
-              />
-              <FieldIcon name="destination" />
+            <span>Destination Type</span>
+            <div className="field-shell select-shell">
+              <select name="destinationType" value={form.destinationType} onChange={updateField}>
+                <option value="address">Address / Hotel / Office</option>
+                <option value="airport">Airport</option>
+              </select>
             </div>
           </label>
+          {form.destinationType === "airport" ? (
+            <>
+              <label>
+                <span>Destination Airport</span>
+                <div className="field-shell select-shell">
+                  <select name="destinationAirport" value={form.destinationAirport} onChange={updateField}>
+                    {airportOptions.map((airport) => (
+                      <option
+                        key={airport.value}
+                        value={airport.value}
+                        disabled={form.pickupType === "airport" && form.pickupAirport === airport.value}
+                      >
+                        {airport.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </label>
+              {form.destinationAirport === "OTHER" && (
+                <label>
+                  <span>Destination Airport Name</span>
+                  <div className="field-shell">
+                    <input name="destinationOtherAirport" value={form.destinationOtherAirport} onChange={updateField} placeholder="Airport name" required />
+                    <FieldIcon name="destinationAddress" />
+                  </div>
+                </label>
+              )}
+            </>
+          ) : (
+            <>
+              <label>
+                <span>Destination Address</span>
+                <div className="field-shell">
+                  <input name="destinationAddress" value={form.destinationAddress} onChange={updateField} placeholder="Street address" required />
+                  <FieldIcon name="destinationAddress" />
+                </div>
+              </label>
+              <label>
+                <span>Destination City</span>
+                <div className="field-shell">
+                  <input name="destinationCity" value={form.destinationCity} onChange={updateField} placeholder="City" required />
+                  <FieldIcon name="destinationCity" />
+                </div>
+              </label>
+              <label>
+                <span>Destination ZIP</span>
+                <div className="field-shell">
+                  <input name="destinationZip" value={form.destinationZip} onChange={updateField} placeholder="ZIP code" inputMode="numeric" required />
+                  <FieldIcon name="destinationZip" />
+                </div>
+              </label>
+            </>
+          )}
           <label>
             <span>Phone Number</span>
             <div className="field-shell">
               <input name="phone" type="tel" value={form.phone} onChange={updateField} placeholder="(313) 555-0124" required />
               <FieldIcon name="phone" />
-            </div>
-          </label>
-          <label>
-            <span>Airport Pickup / Drop-off</span>
-            <div className="field-shell select-shell">
-              <select name="airportType" value={form.airportType} onChange={updateField}>
-                <option value="">Select an option</option>
-                <option>Airport Pickup</option>
-                <option>Airport Drop-off</option>
-                <option>Not Airport Related</option>
-              </select>
             </div>
           </label>
           <label>
@@ -280,13 +422,15 @@ export default function QuoteForm() {
               <FieldIcon name="email" />
             </div>
           </label>
-          <label>
-            <span>Flight Number (Optional)</span>
-            <div className="field-shell">
-              <input name="flightNumber" value={form.flightNumber} onChange={updateField} placeholder="AA1234" />
-              <FieldIcon name="flightNumber" />
-            </div>
-          </label>
+          {form.pickupType === "airport" && (
+            <label>
+              <span>Flight Number (Optional)</span>
+              <div className="field-shell">
+                <input name="flightNumber" value={form.flightNumber} onChange={updateField} placeholder="AA1234" />
+                <FieldIcon name="flightNumber" />
+              </div>
+            </label>
+          )}
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Sending..." : "Request Ride Quote"}
           </button>

@@ -1,0 +1,11 @@
+alter table public.quote_requests add column if not exists trip_type text;
+alter table public.quote_requests add column if not exists pickup_type text;
+alter table public.quote_requests add column if not exists pickup_airport text;
+alter table public.quote_requests add column if not exists pickup_address text;
+alter table public.quote_requests add column if not exists pickup_city text;
+alter table public.quote_requests add column if not exists pickup_zip text;
+alter table public.quote_requests add column if not exists destination_type text;
+alter table public.quote_requests add column if not exists destination_airport text;
+alter table public.quote_requests add column if not exists destination_address text;
+alter table public.quote_requests add column if not exists destination_city text;
+alter table public.quote_requests add column if not exists destination_zip text;

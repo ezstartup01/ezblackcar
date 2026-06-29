@@ -12,6 +12,12 @@ const airportTerms = [
 const mapboxToken = import.meta.env?.VITE_MAPBOX_ACCESS_TOKEN;
 const shortNoticeHours = 3;
 
+export const airportOptions = [
+  { value: "DTW", label: "DTW - Detroit Metro Airport" },
+  { value: "DET", label: "Detroit City Airport / Coleman A. Young" },
+  { value: "OTHER", label: "Other Airport" },
+];
+
 function normalizeText(value) {
   return String(value || "")
     .toLowerCase()
@@ -33,6 +39,37 @@ function toNumber(value) {
 function isAirportLocation(value) {
   const normalized = normalizeText(value);
   return airportTerms.some((term) => normalized.includes(term));
+}
+
+function getAirportLabel(value) {
+  return airportOptions.find((airport) => airport.value === value)?.label || value || "";
+}
+
+export function buildPickupLocation(form) {
+  if (form.pickupType === "airport") {
+    return form.pickupAirport === "OTHER"
+      ? form.pickupOtherAirport
+      : getAirportLabel(form.pickupAirport);
+  }
+
+  return [form.pickupAddress, form.pickupCity, form.pickupZip].filter(Boolean).join(", ");
+}
+
+export function buildDestinationLocation(form) {
+  if (form.destinationType === "airport") {
+    return form.destinationAirport === "OTHER"
+      ? form.destinationOtherAirport
+      : getAirportLabel(form.destinationAirport);
+  }
+
+  return [form.destinationAddress, form.destinationCity, form.destinationZip].filter(Boolean).join(", ");
+}
+
+function getTripType(form, airportPickup, airportDropoff) {
+  if (airportPickup && airportDropoff) return "airport_to_airport";
+  if (airportPickup) return "airport_pickup";
+  if (airportDropoff) return "airport_dropoff";
+  return "point_to_point";
 }
 
 function hasLateNightPickup(timeValue) {
@@ -125,7 +162,9 @@ async function getMapboxDistanceMiles(pickupLocation, destination) {
   };
 }
 
-function resolveBaseFare({ airportPickup, airportDropoff, matchedZone, distanceMiles, rules }) {
+function resolveBaseFare({ airportPickup, airportDropoff, matchedZone, distanceMiles, sameZipTrip, rules }) {
+  if (sameZipTrip) return Number(rules.min_fare || 95);
+
   if (matchedZone) {
     if (airportPickup) return Number(matchedZone.base_airport_pickup);
     if (airportDropoff) return Number(matchedZone.base_airport_dropoff);
@@ -140,11 +179,21 @@ function resolveBaseFare({ airportPickup, airportDropoff, matchedZone, distanceM
 }
 
 export async function calculateQuote(form, zones = defaultQuoteZones, rules = defaultQuoteRules) {
-  const pickupIsAirport = isAirportLocation(form.pickupLocation);
-  const destinationIsAirport = isAirportLocation(form.destination);
-  const airportPickup = pickupIsAirport || form.airportType === "Airport Pickup";
-  const airportDropoff = destinationIsAirport || form.airportType === "Airport Drop-off";
-  const nonAirportLocation = airportPickup ? form.destination : form.pickupLocation;
+  const pickupLocation = buildPickupLocation(form) || form.pickupLocation;
+  const destination = buildDestinationLocation(form) || form.destination;
+  const pickupIsAirport = form.pickupType === "airport" || isAirportLocation(pickupLocation);
+  const destinationIsAirport = form.destinationType === "airport" || isAirportLocation(destination);
+  const airportPickup = pickupIsAirport;
+  const airportDropoff = destinationIsAirport;
+  const tripType = getTripType(form, airportPickup, airportDropoff);
+  const nonAirportLocation = airportPickup ? destination : pickupLocation;
+  const sameAirportTrip = airportPickup && airportDropoff && form.pickupAirport && form.pickupAirport === form.destinationAirport;
+  const sameZipTrip =
+    !airportPickup &&
+    !airportDropoff &&
+    form.pickupZip &&
+    form.destinationZip &&
+    form.pickupZip === form.destinationZip;
   const matchedZone = matchZone(nonAirportLocation, zones);
   const passengers = toNumber(form.passengers);
   const luggageCount = toNumber(form.luggageCount);
@@ -152,8 +201,8 @@ export async function calculateQuote(form, zones = defaultQuoteZones, rules = de
   const reviewReasons = [];
 
   let route = null;
-  if (!matchedZone) {
-    route = await getMapboxDistanceMiles(form.pickupLocation, form.destination);
+  if (!matchedZone && !sameZipTrip && !sameAirportTrip) {
+    route = await getMapboxDistanceMiles(pickupLocation, destination);
   }
 
   const baseFare = resolveBaseFare({
@@ -161,9 +210,11 @@ export async function calculateQuote(form, zones = defaultQuoteZones, rules = de
     airportDropoff,
     matchedZone,
     distanceMiles: route?.distanceMiles,
+    sameZipTrip,
     rules,
   });
 
+  if (sameAirportTrip) reviewReasons.push("same_airport_selected");
   if (!baseFare) reviewReasons.push("manual_distance_review");
   if (pickupDateTime && pickupDateTime.getTime() - Date.now() < shortNoticeHours * 60 * 60 * 1000) {
     reviewReasons.push("pickup_under_3_hours");
@@ -188,6 +239,9 @@ export async function calculateQuote(form, zones = defaultQuoteZones, rules = de
     totalQuote,
     quoteStatus: reviewReasons.length ? "manual_review" : "instant_quote",
     reviewReasons,
+    tripType,
+    pickupLocation,
+    destination,
   };
 }
 
