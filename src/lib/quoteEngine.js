@@ -10,6 +10,7 @@ const airportTerms = [
 ];
 
 const mapboxToken = import.meta.env?.VITE_MAPBOX_ACCESS_TOKEN;
+const shortNoticeHours = 3;
 
 function normalizeText(value) {
   return String(value || "")
@@ -53,6 +54,13 @@ function hasLateNightPickup(timeValue) {
   }
 
   return Number.isFinite(hour) && (hour >= 23 || hour < 5);
+}
+
+function getPickupDateTime(pickupDate, pickupTime) {
+  if (!pickupDate || !pickupTime) return null;
+
+  const dateTime = new Date(`${pickupDate}T${pickupTime}`);
+  return Number.isNaN(dateTime.getTime()) ? null : dateTime;
 }
 
 function getZoneAliases(zone) {
@@ -140,6 +148,7 @@ export async function calculateQuote(form, zones = defaultQuoteZones, rules = de
   const matchedZone = matchZone(nonAirportLocation, zones);
   const passengers = toNumber(form.passengers);
   const luggageCount = toNumber(form.luggageCount);
+  const pickupDateTime = getPickupDateTime(form.pickupDate, form.pickupTime);
   const reviewReasons = [];
 
   let route = null;
@@ -156,6 +165,9 @@ export async function calculateQuote(form, zones = defaultQuoteZones, rules = de
   });
 
   if (!baseFare) reviewReasons.push("manual_distance_review");
+  if (pickupDateTime && pickupDateTime.getTime() - Date.now() < shortNoticeHours * 60 * 60 * 1000) {
+    reviewReasons.push("pickup_under_3_hours");
+  }
   if (passengers && passengers > Number(rules.max_passengers || 6)) reviewReasons.push("passenger_count_review");
   if (luggageCount && luggageCount > Number(rules.max_luggage || 5)) reviewReasons.push("luggage_count_review");
   if (route?.distanceMiles && route.distanceMiles > 60) reviewReasons.push("long_distance_review");

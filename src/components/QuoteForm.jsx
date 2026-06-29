@@ -25,6 +25,8 @@ const initialForm = {
   flightNumber: "",
 };
 
+const shortNoticeHours = 3;
+
 function selectToNumber(value) {
   if (String(value || "").includes("+")) {
     const base = parseInt(String(value).replace(/\D/g, ""), 10);
@@ -34,10 +36,27 @@ function selectToNumber(value) {
   return parseInt(value, 10) || null;
 }
 
+function getTodayValue() {
+  const today = new Date();
+  const offset = today.getTimezoneOffset() * 60000;
+  return new Date(today.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function isShortNoticeRide(form) {
+  if (!form.pickupDate || !form.pickupTime) return false;
+
+  const pickupDateTime = new Date(`${form.pickupDate}T${form.pickupTime}`);
+  if (Number.isNaN(pickupDateTime.getTime())) return false;
+
+  return pickupDateTime.getTime() - Date.now() < shortNoticeHours * 60 * 60 * 1000;
+}
+
 export default function QuoteForm() {
   const [form, setForm] = useState(initialForm);
   const [status, setStatus] = useState({ tone: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const shortNoticeRide = isShortNoticeRide(form);
+  const todayValue = getTodayValue();
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -116,7 +135,9 @@ export default function QuoteForm() {
     setForm(initialForm);
     setStatus({
       tone: "success",
-      message: quote.totalQuote
+      message: quote.reviewReasons.includes("pickup_under_3_hours")
+        ? "Quote request sent. For rides within the next 3 hours, please call us to confirm immediate availability."
+        : quote.totalQuote
         ? `Estimated Black SUV Quote: $${quote.totalQuote}. Final confirmation will be sent by text/email.`
         : "Quote request sent. Final confirmation will be sent by text/email.",
     });
@@ -151,14 +172,28 @@ export default function QuoteForm() {
           <label>
             <span>Pickup Date</span>
             <div className="field-shell">
-              <input name="pickupDate" value={form.pickupDate} onChange={updateField} placeholder="MM / DD / YYYY" required />
+              <input
+                name="pickupDate"
+                type="date"
+                min={todayValue}
+                value={form.pickupDate}
+                onChange={updateField}
+                required
+              />
               <FieldIcon name="pickupDate" />
             </div>
           </label>
           <label>
             <span>Pickup Time</span>
             <div className="field-shell">
-              <input name="pickupTime" value={form.pickupTime} onChange={updateField} placeholder="Select time" required />
+              <input
+                name="pickupTime"
+                type="time"
+                step="900"
+                value={form.pickupTime}
+                onChange={updateField}
+                required
+              />
               <FieldIcon name="pickupTime" />
             </div>
           </label>
@@ -254,6 +289,11 @@ export default function QuoteForm() {
             {isSubmitting ? "Sending..." : "Request Ride Quote"}
           </button>
         </form>
+        {shortNoticeRide && (
+          <p className="form-status warning">
+            For rides within the next 3 hours, please call us to confirm immediate availability.
+          </p>
+        )}
         {status.message && <p className={`form-status ${status.tone}`}>{status.message}</p>}
       </div>
     </section>
