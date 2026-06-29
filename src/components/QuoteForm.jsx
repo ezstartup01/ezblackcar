@@ -10,6 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
+import { calculateQuote, defaultQuoteRules, defaultQuoteZones } from "../lib/quoteEngine.js";
 
 const initialForm = {
   pickupDate: "",
@@ -23,6 +24,15 @@ const initialForm = {
   email: "",
   flightNumber: "",
 };
+
+function selectToNumber(value) {
+  if (String(value || "").includes("+")) {
+    const base = parseInt(String(value).replace(/\D/g, ""), 10);
+    return Number.isFinite(base) ? base + 1 : null;
+  }
+
+  return parseInt(value, 10) || null;
+}
 
 export default function QuoteForm() {
   const [form, setForm] = useState(initialForm);
@@ -48,6 +58,25 @@ export default function QuoteForm() {
 
     setIsSubmitting(true);
 
+    const [{ data: zoneRows }, { data: ruleRows }] = await Promise.all([
+      supabase
+        .from("quote_zones")
+        .select("zone_name, city, zip_codes, aliases, base_airport_pickup, base_airport_dropoff, base_point_to_point")
+        .eq("active", true)
+        .order("display_order", { ascending: true }),
+      supabase
+        .from("quote_rules")
+        .select("*")
+        .eq("active", true)
+        .limit(1),
+    ]);
+
+    const quote = await calculateQuote(
+      form,
+      zoneRows?.length ? zoneRows : defaultQuoteZones,
+      ruleRows?.[0] || defaultQuoteRules,
+    );
+
     const quoteRequest = {
       pickup_date: form.pickupDate,
       pickup_time: form.pickupTime,
@@ -55,10 +84,21 @@ export default function QuoteForm() {
       destination: form.destination,
       phone: form.phone,
       airport_type: form.airportType || null,
-      passengers: form.passengers || null,
-      luggage_count: form.luggageCount || null,
+      passengers: selectToNumber(form.passengers),
+      luggage_count: selectToNumber(form.luggageCount),
       email: form.email || null,
       flight_number: form.flightNumber || null,
+      matched_zone: quote.matchedZone,
+      distance_miles: quote.distanceMiles,
+      duration_minutes: quote.durationMinutes,
+      base_fare: quote.baseFare,
+      airport_fee: quote.airportFee,
+      late_night_fee: quote.lateNightFee,
+      extra_fees: quote.extraFees,
+      gratuity: quote.gratuity,
+      total_quote: quote.totalQuote,
+      quote_status: quote.quoteStatus,
+      notes: quote.reviewReasons.length ? quote.reviewReasons.join(", ") : null,
     };
 
     const { error } = await supabase.from("quote_requests").insert(quoteRequest);
@@ -76,7 +116,9 @@ export default function QuoteForm() {
     setForm(initialForm);
     setStatus({
       tone: "success",
-      message: "Quote request sent. We will follow up shortly.",
+      message: quote.totalQuote
+        ? `Estimated Black SUV Quote: $${quote.totalQuote}. Final confirmation will be sent by text/email.`
+        : "Quote request sent. Final confirmation will be sent by text/email.",
     });
   }
 

@@ -146,6 +146,6 @@ set active = false
 where vehicle_type = 'black_suv';
 
 insert into public.quote_rules
-  (vehicle_type, included_wait_minutes, airport_pickup_fee, late_night_fee, extra_stop_fee, child_seat_fee, gratuity_percent, max_passengers, max_luggage, min_fare, active)
+  (vehicle_type, included_wait_minutes, airport_pickup_fee, extra_stop_fee, child_seat_fee, late_night_fee, gratuity_percent, max_passengers, max_luggage, min_fare, active)
 values
-  ('black_suv', 15, 15, 20, 20, 15, 20, 6, 5, 95, true);
+  ('black_suv', 15, 15, 20, 15, 20, 20, 6, 5, 95, true);
