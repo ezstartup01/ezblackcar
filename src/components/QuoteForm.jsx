@@ -156,6 +156,8 @@ export default function QuoteForm() {
   };
 
   function FieldIcon({ name }) {
+    if (name === "pickupDate" || name === "pickupTime") return null;
+
     const Icon = fieldIcons[name];
     return Icon ? <Icon className="field-icon" size={18} aria-hidden="true" /> : null;
   }
