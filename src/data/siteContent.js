@@ -1,12 +1,12 @@
 const image = (name) => `/images/${name}`;
 
 export const navItems = [
-  { label: "Home", href: "#top" },
-  { label: "Airport Service", href: "#services" },
-  { label: "Corporate Accounts", href: "#corporate-accounts" },
-  { label: "Services", href: "#services" },
-  { label: "About Us", href: "#why-choose" },
-  { label: "Contact", href: "#contact" },
+  { label: "Home", href: "/" },
+  { label: "Airport Service", href: "/#services" },
+  { label: "Corporate Accounts", href: "/#corporate-inquiry" },
+  { label: "Services", href: "/#services" },
+  { label: "About Us", href: "/about" },
+  { label: "Contact", href: "/contact" },
 ];
 
 export const trustItems = [
@@ -36,24 +36,28 @@ export const services = [
   {
     title: "DTW Airport Transfers",
     description: "Reliable airport pickup and drop-off with flight tracking and timely service.",
+    alt: "Black SUV airport transfer service for DTW Airport and Metro Detroit",
     image: image("service-dtw-airport-transfer.png"),
     icon: image("icon-airport-service.png"),
   },
   {
     title: "Corporate Transportation",
     description: "Dependable service for executives, employees, guests, and corporate clients.",
+    alt: "Corporate black car transportation for executives and business guests",
     image: image("service-corporate-transportation.png"),
     icon: image("icon-corporate-billing.png"),
   },
   {
     title: "Executive SUV Service",
     description: "Ride in comfort and style with our black Ford Expedition. Spacious, clean, and professional.",
+    alt: "Executive black SUV service with a black Ford Expedition in Metro Detroit",
     image: image("service-executive-black-suv.png"),
     icon: image("icon-location-pin.png"),
   },
   {
     title: "Hourly Chauffeur Service",
     description: "Perfect for meetings, events, and multi-stop business travel throughout the day.",
+    alt: "Hourly chauffeur service for meetings, events, and business travel",
     image: image("service-hourly-chauffeur.png"),
     icon: image("icon-clock.png"),
   },
@@ -108,6 +112,12 @@ export const assets = {
   heroMobile: image("hero-dtw-black-expedition-mobile.png"),
   whyImage: image("why-choose-executive-passengers-suv.png"),
   corporateImage: image("corporate-accounts-business-billing.png"),
+  faqContactImage: image("faq-contact-suv.png"),
+  aboutHero: image("about/about-hero.png"),
+  aboutWhoWeAre: image("about/about-who-we-are.png"),
+  aboutFleet: image("about/about-fleet.png"),
+  contactHero: image("contact/contact-hero.png"),
+  contactMap: image("contact/contact-map.png"),
   map: image("michigan-map-gold-transparent.png"),
   clock: image("icon-clock.png"),
   phone: image("icon-phone.png"),

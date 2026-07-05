@@ -11,6 +11,9 @@ ez_black_car_batch3/
 ez_black_car_icons/
 ez_black_car_svg_icons/
 Jsonfile/
+About Us/
+Contact us/
+.codex-*.log
 /*.zip
 /*.json
 /*.html
@@ -20,3 +23,6 @@ Jsonfile/
 !package-lock.json
 !index.html
 !public/**/*.png
+
+.vercel
+.env*

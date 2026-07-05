@@ -12,25 +12,25 @@
   - `ezblackcars.com` -> `ezblackcar.com`
   - `www.ezblackcars.com` -> `ezblackcar.com`
 
-## Latest Git Backup Point
+## Latest Workspace State
 
-Current pushed commit:
+Current workspace is ahead of the last pushed backup point and includes substantial uncommitted work.
+
+Last pushed commit:
 
 ```text
 0cceb8b Reduce quote form field height
 ```
 
-Recent work:
+Current local changes include:
 
-```text
-0cceb8b Reduce quote form field height
-ce5d4d4 Add structured pickup and destination fields
-65163ce Polish quote form warning UI
-92d4baa Add pickup date time validation
-0c697e5 Add instant quote engine
-```
-
-Note: `Reservation/` is currently untracked and was intentionally left untouched.
+- Quote/reservation multi-step flow in `src/components/QuoteForm.jsx`
+- Reservation + authorization UI work in `src/styles.css`
+- Local Vite middleware for `/api/quote` in `vite.config.js`
+- Server quote route in `api/quote.js`
+- Launch pricing module in `src/lib/pricing.js`
+- New Supabase migration in `supabase/migrations/20260629170000_launch_competitive_pricing.sql`
+- README and env updates for server quote variables
 
 ## Supabase
 
@@ -76,9 +76,39 @@ Database verification completed:
 - Public insert into `quote_requests` works.
 - Structured quote request insert works after the column patch.
 
+## Quote / Reservation Flow
+
+The quote flow is now effectively a reusable module and should be preserved as a standalone pattern.
+
+Current step model:
+
+1. `Quote`
+2. `Reservation`
+3. `Authorization`
+
+Current intended business UX:
+
+1. Client creates quote
+2. Quote form hides
+3. Quote summary + reserve/authorize screen appears
+4. `Edit Quote` returns to quote mode and hides reservation screen
+5. Client re-generates quote if trip changes
+6. `Reserve the Ride` is intended to include authorization
+7. Next screen later should be confirmation only
+
+Important current behavior:
+
+- When `Edit Quote` is clicked:
+  - quote form reappears
+  - reservation/authorization section hides
+  - previously entered values remain in session state
+- Trip-changing fields invalidate the stored quote and force re-quote
+- Quote flow state is cached in `sessionStorage`
+- Quote form and reservation flow are both currently in `src/components/QuoteForm.jsx`
+
 ## Quote Form Behavior
 
-The public form now uses structured pickup and destination logic.
+The public quote form now uses structured pickup and destination logic.
 
 Pickup:
 
@@ -116,7 +146,7 @@ If destination is address:
 - Destination City
 - Destination ZIP
 
-Other fields:
+Other quote fields:
 
 - Phone
 - Passengers
@@ -136,48 +166,116 @@ Files:
 
 - `src/components/QuoteForm.jsx`
 - `src/lib/quoteEngine.js`
+- `src/lib/pricing.js`
 - `src/data/defaultQuoteData.js`
+- `api/quote.js`
 
-Rules implemented:
+Reusable quote module pieces now in place:
 
-- DTW airport pickup to Downtown Detroit test quote: `$130`
-- Downtown Detroit to DTW airport drop-off test quote: `$115`
-- Same ZIP address-to-address test quote: `$95`
-- Pickup under 3 hours becomes `manual_review`
-- Pickup under 3 hours shows centered bold warning/call message
-- Flight number only appears for airport pickup
-- Same pickup/destination airport is prevented
-- If Mapbox token is later added, unknown address routes can use distance fallback
+- structured quote form UI
+- airport/address switching logic
+- Mapbox autocomplete wiring
+- server-side quote route
+- launch pricing calculator
+- quote invalidation/session persistence
 
-Mapbox planned env var:
+Current pricing / rules implemented:
+
+- server-side launch competitive quote logic is active
+- pickup under 3 hours becomes `manual_review`
+- pickup under 3 hours shows centered warning/call message
+- flight fields appear only in airport contexts
+- same pickup/destination airport is prevented
+- Mapbox route distance/duration is used server-side
+- quote request inserts tolerate older Supabase schemas by dropping missing fields dynamically
+
+Mapbox env vars in use:
 
 ```text
 VITE_MAPBOX_ACCESS_TOKEN
+MAPBOX_ACCESS_TOKEN
+```
+
+Server quote env vars in use:
+
+```text
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+MAPBOX_ACCESS_TOKEN
 ```
 
 ## Design / UI Notes
 
 Recent visual fixes:
 
-- Removed duplicate icons from native date/time fields
-- Warning message is centered, larger, and bold
-- Quote form field height reduced:
-  - Field height: `50px`
-  - Submit button: `44px`
-  - Row gap tightened
+- Removed duplicate framing from native date/time fields
+- Increased field-label font size
+- Default passengers set to `1`
+- Quote form hides after successful quote
+- `Edit Quote` and `Reserve the Ride` now sit together at the bottom of reservation flow
+- Quote summary strip replaced the earlier 3-card layout
+- Reserve/authorize screen is split into two side-by-side cards:
+  - left: contact + notes
+  - right: payment authorization fields
+- Authorization notice and consent were merged into one compact bottom card
+- Reservation summary sidebar was removed as duplicate/wasteful
+
+Current quote summary strip fields:
+
+- Estimate Quote
+- Date Time
+- Pickup
+- Destination
+- Other Details
+
+Current reserve/authorize section layout:
+
+- heading centered
+- left card:
+  - Full Name
+  - Phone Number
+  - Email Address
+  - Special Instructions / Notes
+- right card:
+  - Cardholder Name
+  - Card Number
+  - Expiration Date
+  - CVC
+  - Billing ZIP Code
+- bottom merged authorization card:
+  - authorization copy
+  - consent checkbox
+- bottom action row:
+  - Edit Quote
+  - Reserve the Ride
+
+Known UI state at handoff:
+
+- User generally likes the quote module now
+- Summary strip can still be polished later
+- Reservation screen layout is close, but may still need visual refinement tomorrow
+- Actual payment processor is not integrated yet; fields are UI only
+- Confirmation screen is not yet implemented as final UX
 
 ## Tomorrow Suggested Next Steps
 
-1. Manually test `https://ezblackcar.com/#quote-form`.
-2. Check that date/time picker UI feels good on desktop and mobile.
-3. Review the structured form layout after Vercel deployment.
-4. Decide whether to add Mapbox now or after finalizing the form UX.
-5. If adding Mapbox:
-   - create free Mapbox account
-   - restrict public token by domain
-   - add `VITE_MAPBOX_ACCESS_TOKEN` to Vercel and `.env.local`
-   - test unknown address distance quote
-6. Later improvement: move quote calculation to a Vercel API route so Mapbox and future business logic are server-side.
+1. Final polish pass on reservation/authorization layout.
+2. Decide whether to freeze the quote summary strip design or replace it later.
+3. Integrate real payment authorization provider into the existing reserve screen.
+4. Implement confirmation screen only after authorization wiring is real.
+5. Add staff/client notification flow after reservation submission.
+6. If desired, refactor quote flow into a reusable module/component boundary after UI stabilizes.
+
+## Important Resume Notes
+
+- Do not rebuild the quote logic from scratch; the current quote module is the strongest reusable piece and should be preserved.
+- If resuming UI work tomorrow, start in:
+  - `src/components/QuoteForm.jsx`
+  - `src/styles.css`
+- If resuming pricing/server work tomorrow, start in:
+  - `api/quote.js`
+  - `src/lib/pricing.js`
+  - `vite.config.js`
 
 ## Commands
 
