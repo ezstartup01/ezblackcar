@@ -161,6 +161,7 @@ export default async function handler(req, res) {
   let quoteRequestId = cleanText(body?.quoteRequestId || quote?.quoteRequestId);
   const changeType = cleanText(body?.changeType);
   const message = cleanText(body?.message);
+  const requestedDetails = body?.requestedDetails && typeof body.requestedDetails === "object" ? body.requestedDetails : null;
 
   if ((!quoteRequestId && !bookingToken) || !changeType || !message) {
     return json(res, 400, { error: "Missing required change request details." });
@@ -211,9 +212,21 @@ export default async function handler(req, res) {
   }
 
   const subject = `Ride change request for ${form.pickupDate || "authorized trip"}`;
+  const requestedRows = requestedDetails
+    ? [
+        `Requested Pickup Date: ${cleanText(requestedDetails.pickupDate) || "Not provided"}`,
+        `Requested Pickup Time: ${cleanText(requestedDetails.pickupTime) || "Not provided"}`,
+        `Requested Pickup: ${cleanText(requestedDetails.pickupLocation) || "Not provided"}`,
+        `Requested Destination: ${cleanText(requestedDetails.destination) || "Not provided"}`,
+        `Requested Passengers: ${cleanText(requestedDetails.passengers) || "Not provided"}`,
+        `Requested Luggage: ${cleanText(requestedDetails.luggageCount) || "Not provided"}`,
+        `Requested Flight Details: ${cleanText(requestedDetails.flightNumber) || "Not provided"}`,
+      ]
+    : [];
   const recordMessage = [
     `Change Type: ${changeType}`,
     `Requested Change: ${message}`,
+    ...requestedRows,
     `Quote Request ID: ${quoteRequestId}`,
     `Payment Reference: ${authorizationResult?.paymentIntentId || "Not provided"}`,
     `Amount Authorized: ${quote?.totalQuote ? `$${quote.totalQuote}` : "Not provided"}`,

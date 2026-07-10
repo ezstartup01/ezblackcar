@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { CreditCard, Mail, MapPin, Route, UserRound } from "lucide-react";
 
-const initialChangeRequest = { changeType: "Pickup time", message: "" };
+const initialChangeRequest = {
+  pickupDate: "",
+  pickupTime: "",
+  pickupLocation: "",
+  destination: "",
+  passengers: "1",
+  luggageCount: "",
+  flightNumber: "",
+  message: "",
+};
 
 function formatMoney(value) {
   const amount = Number.parseFloat(value);
@@ -12,10 +21,22 @@ function formatDateTime(date, time) {
   return [date, time].filter(Boolean).join(" • ") || "Pending";
 }
 
+function buildInitialChangeRequest(reservation) {
+  return {
+    pickupDate: reservation.pickupDate || "",
+    pickupTime: reservation.pickupTime || "",
+    pickupLocation: reservation.pickupLocation || "",
+    destination: reservation.destination || "",
+    passengers: String(reservation.passengers || "1"),
+    luggageCount: reservation.luggageCount ? String(reservation.luggageCount) : "",
+    flightNumber: reservation.flightNumber || "",
+    message: "",
+  };
+}
+
 export default function ReservationPage({ token }) {
   const [reservation, setReservation] = useState(null);
   const [status, setStatus] = useState({ tone: "", message: "" });
-  const [showChangeRequest, setShowChangeRequest] = useState(false);
   const [changeRequest, setChangeRequest] = useState(initialChangeRequest);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [changeStatus, setChangeStatus] = useState({ tone: "", message: "" });
@@ -33,7 +54,10 @@ export default function ReservationPage({ token }) {
           throw new Error(payload?.error || "Reservation was not found.");
         }
 
-        if (!ignore) setReservation(payload.reservation);
+        if (!ignore) {
+          setReservation(payload.reservation);
+          setChangeRequest(buildInitialChangeRequest(payload.reservation));
+        }
       } catch (error) {
         if (!ignore) {
           setStatus({
@@ -59,10 +83,18 @@ export default function ReservationPage({ token }) {
   async function submitChangeRequest(event) {
     event.preventDefault();
 
-    if (!changeRequest.changeType || !changeRequest.message.trim()) {
+    if (!changeRequest.pickupDate || !changeRequest.pickupTime || !changeRequest.pickupLocation.trim() || !changeRequest.destination.trim()) {
       setChangeStatus({
         tone: "warning",
-        message: "Please choose a change type and describe what needs to change.",
+        message: "Please keep pickup date, pickup time, pickup location, and destination on the request.",
+      });
+      return;
+    }
+
+    if (!changeRequest.message.trim()) {
+      setChangeStatus({
+        tone: "warning",
+        message: "Please add a short note explaining what changed.",
       });
       return;
     }
@@ -76,7 +108,8 @@ export default function ReservationPage({ token }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bookingToken: token,
-          changeType: changeRequest.changeType,
+          changeType: "Reservation detail update",
+          requestedDetails: changeRequest,
           message: changeRequest.message,
         }),
       });
@@ -86,8 +119,6 @@ export default function ReservationPage({ token }) {
         throw new Error(payload?.error || "Unable to submit change request.");
       }
 
-      setShowChangeRequest(false);
-      setChangeRequest(initialChangeRequest);
       setChangeStatus({
         tone: "success",
         message: payload?.message || "Your change request was received.",
@@ -166,72 +197,72 @@ export default function ReservationPage({ token }) {
               </article>
             </div>
 
-            <div className="reservation-change-card">
-              <div>
-                <h2>Need to request a change?</h2>
-                <p>
-                  Submit the request here. It will not update the trip automatically; EZ Black Car will review
-                  timing, availability, pricing, and authorization before making changes.
-                </p>
+            <form className="reservation-change-form" aria-labelledby="change-request-title" onSubmit={submitChangeRequest}>
+              <div className="reservation-change-heading">
+                <div>
+                  <p className="eyebrow">Request Changes</p>
+                  <h2 id="change-request-title">Need to change this trip?</h2>
+                  <p>
+                    Update the fields below and submit the request. This does not change your reservation automatically.
+                  </p>
+                </div>
               </div>
-              <button type="button" className="button dark reservation-secondary-action" onClick={() => setShowChangeRequest(true)}>
-                Request a Change
-              </button>
-            </div>
+
+              <div className="reservation-change-grid">
+                <label>
+                  <span>Pickup Date</span>
+                  <input name="pickupDate" type="date" value={changeRequest.pickupDate} onChange={updateChangeRequest} />
+                </label>
+                <label>
+                  <span>Pickup Time</span>
+                  <input name="pickupTime" type="time" value={changeRequest.pickupTime} onChange={updateChangeRequest} />
+                </label>
+                <label className="reservation-change-wide">
+                  <span>Pickup Location</span>
+                  <input name="pickupLocation" value={changeRequest.pickupLocation} onChange={updateChangeRequest} />
+                </label>
+                <label className="reservation-change-wide">
+                  <span>Destination</span>
+                  <input name="destination" value={changeRequest.destination} onChange={updateChangeRequest} />
+                </label>
+                <label>
+                  <span>Passengers</span>
+                  <input name="passengers" type="number" min="1" max="14" value={changeRequest.passengers} onChange={updateChangeRequest} />
+                </label>
+                <label>
+                  <span>Luggage</span>
+                  <input name="luggageCount" type="number" min="0" max="20" value={changeRequest.luggageCount} onChange={updateChangeRequest} />
+                </label>
+                <label className="reservation-change-wide">
+                  <span>Flight Details</span>
+                  <input name="flightNumber" value={changeRequest.flightNumber} onChange={updateChangeRequest} placeholder="Airline / flight number" />
+                </label>
+                <label className="reservation-change-full">
+                  <span>Reason / Notes</span>
+                  <textarea
+                    name="message"
+                    value={changeRequest.message}
+                    onChange={updateChangeRequest}
+                    maxLength={700}
+                    placeholder="Tell us what changed or what you need adjusted."
+                  />
+                  <small>{changeRequest.message.length}/700</small>
+                </label>
+              </div>
+
+              <div className="reservation-change-submit">
+                <p>
+                  Submitting this request does not update your reservation automatically. EZ Black Car will review
+                  availability, price, timing, and authorization before confirming any change.
+                </p>
+                <button type="submit" className="button dark reservation-secondary-action" disabled={isSubmitting}>
+                  {isSubmitting ? "Submitting..." : "Submit Change Request"}
+                </button>
+              </div>
+            </form>
           </>
         ) : null}
       </section>
-
-      {showChangeRequest ? (
-        <div className="quote-modal-backdrop" role="presentation">
-          <form className="quote-modal quote-change-modal" role="dialog" aria-modal="true" aria-labelledby="change-request-title" onSubmit={submitChangeRequest}>
-            <h4 id="change-request-title">Request a Trip Change</h4>
-            <p>
-              Tell us what changed. This request will be reviewed before your reservation, pricing,
-              or authorization is updated.
-            </p>
-            <label className="quote-modal-field">
-              <span>Change Type</span>
-              <select name="changeType" value={changeRequest.changeType} onChange={updateChangeRequest}>
-                <option>Pickup time</option>
-                <option>Pickup location</option>
-                <option>Destination</option>
-                <option>Passenger or luggage count</option>
-                <option>Flight details</option>
-                <option>Medical or emergency situation</option>
-                <option>Other</option>
-              </select>
-            </label>
-            <label className="quote-modal-field">
-              <span>What needs to change?</span>
-              <textarea
-                name="message"
-                value={changeRequest.message}
-                onChange={updateChangeRequest}
-                maxLength={600}
-                placeholder="Example: Passenger is experiencing a medical emergency and we need to move pickup earlier."
-              />
-              <small>{changeRequest.message.length}/600</small>
-            </label>
-            {changeStatus.message ? <p className={`form-status ${changeStatus.tone}`}>{changeStatus.message}</p> : null}
-            <div className="quote-modal-actions">
-              <button
-                type="button"
-                className="button quote-modal-cancel"
-                onClick={() => {
-                  setShowChangeRequest(false);
-                  setChangeStatus({ tone: "", message: "" });
-                }}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="button dark quote-modal-confirm" disabled={isSubmitting}>
-                {isSubmitting ? "Submitting..." : "Submit Request"}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
     </main>
   );
 }

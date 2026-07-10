@@ -2146,31 +2146,90 @@ mapbox-address-autofill {
   overflow-wrap: anywhere;
 }
 
-.reservation-change-card {
-  align-items: center;
+.reservation-change-form {
   background: #fffaf1;
   border: 1px solid rgba(190, 132, 33, 0.28);
   border-radius: 8px;
-  display: grid;
-  gap: 18px;
-  grid-template-columns: minmax(0, 1fr) auto;
   margin-top: 18px;
   padding: 22px 24px;
 }
 
-.reservation-change-card h2 {
+.reservation-change-heading {
+  margin-bottom: 18px;
+}
+
+.reservation-change-heading h2 {
   color: #07111e;
-  font-size: 24px;
+  font-size: clamp(26px, 3vw, 36px);
   line-height: 1.15;
   margin: 0 0 8px;
 }
 
-.reservation-change-card p {
+.reservation-change-heading p,
+.reservation-change-submit p {
   color: #374151;
   font-size: 15px;
   line-height: 1.5;
   margin: 0;
   max-width: 760px;
+}
+
+.reservation-change-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.reservation-change-grid label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.reservation-change-grid span {
+  color: #07111e;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.reservation-change-grid input,
+.reservation-change-grid textarea {
+  background: #fff;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  color: #07111e;
+  font: inherit;
+  min-height: 46px;
+  padding: 11px 12px;
+  width: 100%;
+}
+
+.reservation-change-grid textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.reservation-change-grid small {
+  color: #6b7280;
+  font-size: 11px;
+  justify-self: end;
+}
+
+.reservation-change-wide {
+  grid-column: span 2;
+}
+
+.reservation-change-full {
+  grid-column: 1 / -1;
+}
+
+.reservation-change-submit {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin-top: 18px;
 }
 
 .quote-modal-actions {
@@ -3356,11 +3415,20 @@ mapbox-address-autofill {
   }
 
   .reservation-detail-grid,
-  .reservation-change-card {
+  .reservation-change-grid {
     grid-template-columns: 1fr;
   }
 
-  .reservation-change-card .button {
+  .reservation-change-wide {
+    grid-column: 1 / -1;
+  }
+
+  .reservation-change-submit {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reservation-change-submit .button {
     width: 100%;
   }
 
