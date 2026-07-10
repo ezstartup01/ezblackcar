@@ -114,11 +114,12 @@ async function resolveRoute(form, token) {
 
 async function insertQuoteRequest(supabase, payload) {
   const id = randomUUID();
-  let insertPayload = { id, ...payload };
+  const bookingToken = randomUUID();
+  let insertPayload = { id, booking_token: bookingToken, ...payload };
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const { error } = await supabase.from("quote_requests").insert(insertPayload);
-    if (!error) return { id, error: null };
+    if (!error) return { id, bookingToken: "booking_token" in insertPayload ? bookingToken : null, error: null };
 
     const missingColumn = getMissingColumn(error.message);
     if (!missingColumn || !(missingColumn in insertPayload)) {
@@ -214,8 +215,8 @@ export default async function handler(req, res) {
     notes: quote.manualReviewReasons.length ? quote.manualReviewReasons.join(" | ") : null,
   };
 
-  const { id: quoteRequestId, error } = await insertQuoteRequest(supabase, payload);
+  const { id: quoteRequestId, bookingToken, error } = await insertQuoteRequest(supabase, payload);
   if (error) return json(res, 500, { error: error.message || "Failed to save quote request." });
 
-  return json(res, 200, { ...quote, quoteRequestId });
+  return json(res, 200, { ...quote, quoteRequestId, bookingToken });
 }

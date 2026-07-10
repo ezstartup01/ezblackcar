@@ -154,18 +154,62 @@ export default async function handler(req, res) {
   }
 
   const body = normalizeBody(req.body);
-  const form = body?.form || {};
-  const quote = body?.quote || {};
-  const authorizationResult = body?.authorizationResult || {};
-  const quoteRequestId = cleanText(body?.quoteRequestId || quote?.quoteRequestId);
+  let form = body?.form || {};
+  let quote = body?.quote || {};
+  let authorizationResult = body?.authorizationResult || {};
+  const bookingToken = cleanText(body?.bookingToken || body?.token);
+  let quoteRequestId = cleanText(body?.quoteRequestId || quote?.quoteRequestId);
   const changeType = cleanText(body?.changeType);
   const message = cleanText(body?.message);
 
-  if (!cleanText(form.fullName) || !cleanText(form.email) || !quoteRequestId || !changeType || !message) {
+  if ((!quoteRequestId && !bookingToken) || !changeType || !message) {
     return json(res, 400, { error: "Missing required change request details." });
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
+
+  if (bookingToken) {
+    const { data: reservation, error: reservationError } = await supabase
+      .from("quote_requests")
+      .select("id, customer_name, email, phone, pickup_date, pickup_time, pickup_location, destination, pickup_type, pickup_airport, pickup_address, pickup_city, pickup_zip, destination_type, destination_airport, destination_address, destination_city, destination_zip, passengers, total_quote, amount_authorized, stripe_payment_intent_id")
+      .eq("booking_token", bookingToken)
+      .single();
+
+    if (reservationError || !reservation) {
+      return json(res, 404, { error: "Reservation was not found for this change request." });
+    }
+
+    quoteRequestId = reservation.id;
+    form = {
+      fullName: reservation.customer_name,
+      email: reservation.email,
+      phone: reservation.phone,
+      pickupDate: reservation.pickup_date,
+      pickupTime: reservation.pickup_time,
+      pickupType: reservation.pickup_type,
+      pickupAirport: reservation.pickup_airport,
+      pickupAddress: reservation.pickup_address || reservation.pickup_location,
+      pickupCity: reservation.pickup_city,
+      pickupZip: reservation.pickup_zip,
+      destinationType: reservation.destination_type,
+      destinationAirport: reservation.destination_airport,
+      destinationAddress: reservation.destination_address || reservation.destination,
+      destinationCity: reservation.destination_city,
+      destinationZip: reservation.destination_zip,
+    };
+    quote = {
+      totalQuote: reservation.amount_authorized || reservation.total_quote,
+      quoteRequestId,
+    };
+    authorizationResult = {
+      paymentIntentId: reservation.stripe_payment_intent_id,
+    };
+  }
+
+  if (!cleanText(form.fullName) || !cleanText(form.email) || !quoteRequestId) {
+    return json(res, 400, { error: "Reservation is missing required customer details." });
+  }
+
   const subject = `Ride change request for ${form.pickupDate || "authorized trip"}`;
   const recordMessage = [
     `Change Type: ${changeType}`,

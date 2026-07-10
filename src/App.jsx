@@ -29,6 +29,7 @@ import CorporateInquiryForm from "./components/CorporateInquiryForm.jsx";
 import FaqSection from "./components/FaqSection.jsx";
 import LegalPage from "./components/LegalPage.jsx";
 import QuoteForm from "./components/QuoteForm.jsx";
+import ReservationPage from "./components/ReservationPage.jsx";
 import { faqItems } from "./data/faqContent.js";
 import { assets, serviceAreas, services, trustItems, whyChoose } from "./data/siteContent.js";
 import { legalContact, legalPageMeta } from "./data/legalContent.js";
@@ -38,6 +39,7 @@ export default function App() {
   const isHome = path === "/";
   const isAbout = path === "/about";
   const isContact = path === "/contact";
+  const reservationMatch = path.match(/^\/reservation\/([^/]+)$/);
   const serviceIcons = [Plane, BriefcaseBusiness, ShieldCheck, Clock3];
   const trustIcons = [Tag, UserRound, FileText, Plane];
   const whyIcons = [ShieldCheck, BadgeCheck, UserRound, Shield, BriefcaseBusiness, Clock3];
@@ -174,7 +176,9 @@ export default function App() {
   return (
     <>
       <Header />
-      {isHome ? (
+      {reservationMatch ? (
+        <ReservationPage token={decodeURIComponent(reservationMatch[1])} />
+      ) : isHome ? (
       <main id="top">
         <section className="hero">
           <picture>
