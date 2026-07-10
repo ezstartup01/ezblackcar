@@ -177,6 +177,23 @@ export default async function handler(req, res) {
     `Destination: ${getLocationSummary(form, "destination") || "Not provided"}`,
   ].join("\n");
 
+  const { error: changeRequestError } = await supabase.from("ride_change_requests").insert({
+    quote_request_id: quoteRequestId,
+    full_name: cleanText(form.fullName),
+    email: cleanText(form.email),
+    phone: cleanText(form.phone) || null,
+    change_type: changeType,
+    message,
+    payment_reference: cleanText(authorizationResult?.paymentIntentId) || null,
+    amount_authorized: Number.isFinite(Number.parseFloat(quote?.totalQuote)) ? Number.parseFloat(quote.totalQuote) : null,
+    status: "new",
+    source: "authorization_screen",
+  });
+
+  if (changeRequestError) {
+    return json(res, 500, { error: changeRequestError.message || "Failed to record change request against this reservation." });
+  }
+
   const { error: contactError } = await supabase.from("contact_messages").insert({
     full_name: cleanText(form.fullName),
     email: cleanText(form.email),
