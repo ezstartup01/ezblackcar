@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
 import { defaultQuoteZones } from "../src/data/defaultQuoteData.js";
 import { calculateLaunchCompetitiveQuote } from "../src/lib/pricing.js";
 import { airportOptions } from "../src/lib/quoteEngine.js";
@@ -7,6 +8,10 @@ function json(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(body));
+}
+
+function cleanEnvValue(value) {
+  return String(value || "").replace(/^\uFEFF/, "").trim();
 }
 
 function omitKeys(object, keys) {
@@ -108,32 +113,38 @@ async function resolveRoute(form, token) {
 }
 
 async function insertQuoteRequest(supabase, payload) {
-  let insertPayload = { ...payload };
+  const id = randomUUID();
+  let insertPayload = { id, ...payload };
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const { error } = await supabase.from("quote_requests").insert(insertPayload);
-    if (!error) return null;
+    if (!error) return { id, error: null };
 
     const missingColumn = getMissingColumn(error.message);
     if (!missingColumn || !(missingColumn in insertPayload)) {
-      return error;
+      return { id: null, error };
     }
 
     insertPayload = omitKeys(insertPayload, [missingColumn]);
   }
 
-  return new Error("Failed to save quote request because the database schema is missing required columns.");
+  return {
+    id: null,
+    error: new Error("Failed to save quote request because the database schema is missing required columns."),
+  };
 }
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
 
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseUrl = cleanEnvValue(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
   const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN || process.env.VITE_MAPBOX_ACCESS_TOKEN;
+    cleanEnvValue(
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    );
+  const mapboxToken = cleanEnvValue(process.env.MAPBOX_ACCESS_TOKEN || process.env.VITE_MAPBOX_ACCESS_TOKEN);
 
   if (!supabaseUrl || !supabaseKey || !mapboxToken) {
     return json(res, 500, { error: "Server environment is missing Supabase or Mapbox configuration." });
@@ -203,8 +214,8 @@ export default async function handler(req, res) {
     notes: quote.manualReviewReasons.length ? quote.manualReviewReasons.join(" | ") : null,
   };
 
-  const error = await insertQuoteRequest(supabase, payload);
+  const { id: quoteRequestId, error } = await insertQuoteRequest(supabase, payload);
   if (error) return json(res, 500, { error: error.message || "Failed to save quote request." });
 
-  return json(res, 200, quote);
+  return json(res, 200, { ...quote, quoteRequestId });
 }

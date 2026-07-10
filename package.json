@@ -9,16 +9,21 @@
     "preview": "vite preview --host 0.0.0.0",
     "deploy:prod": "node scripts/deploy-production.mjs",
     "deploy:web": "node scripts/deploy-production.mjs --web-only",
-    "deploy:function": "node scripts/deploy-production.mjs --function-only"
+    "deploy:function": "node scripts/deploy-production.mjs --function-only",
+    "move:check": "node scripts/move-production.mjs --check",
+    "move:production": "node scripts/move-production.mjs"
   },
   "dependencies": {
     "@mapbox/search-js-react": "^1.5.1",
+    "@stripe/react-stripe-js": "^6.7.0",
+    "@stripe/stripe-js": "^9.9.0",
     "@supabase/supabase-js": "^2.108.2",
     "@vitejs/plugin-react": "^4.3.4",
     "lucide-react": "^0.468.0",
     "nodemailer": "^9.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "stripe": "^22.3.1",
     "vite": "^6.0.7"
   },
   "devDependencies": {

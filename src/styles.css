@@ -855,6 +855,22 @@ mapbox-address-autofill {
   padding: 12px 14px;
 }
 
+.stripe-card-shell {
+  align-items: center;
+  min-height: 44px;
+  padding: 13px 14px;
+}
+
+.stripe-card-shell > div {
+  width: 100%;
+}
+
+.stripe-card-unavailable {
+  color: #991b1b;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .authorization-notice {
   display: grid;
   gap: 4px;

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { AddressAutofill } from "@mapbox/search-js-react";
+import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -23,9 +25,6 @@ const initialForm = {
   pickupTime: "",
   fullName: "",
   cardholderName: "",
-  cardNumber: "",
-  cardExpiry: "",
-  cardCvc: "",
   billingZip: "",
   authorizationAccepted: false,
   pickupType: "address",
@@ -48,7 +47,13 @@ const initialForm = {
 };
 
 const shortNoticeHours = 3;
-const mapboxToken = import.meta.env?.VITE_MAPBOX_ACCESS_TOKEN;
+function cleanEnvValue(value) {
+  return String(value || "").replace(/^\uFEFF/, "").trim();
+}
+
+const mapboxToken = cleanEnvValue(import.meta.env?.VITE_MAPBOX_ACCESS_TOKEN);
+const stripePublishableKey = cleanEnvValue(import.meta.env?.VITE_STRIPE_PUBLISHABLE_KEY);
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 const STORAGE_KEY = "ezblackcar_quote_flow_v1";
 const tripFieldNames = new Set([
   "pickupDate",
@@ -125,7 +130,27 @@ function getAutofillValue(feature, keys) {
   return "";
 }
 
-export default function QuoteForm() {
+const cardElementOptions = {
+  hidePostalCode: true,
+  style: {
+    base: {
+      color: "#111827",
+      fontFamily: "Arial, sans-serif",
+      fontSize: "16px",
+      "::placeholder": {
+        color: "#6b7280",
+      },
+    },
+    invalid: {
+      color: "#991b1b",
+      iconColor: "#991b1b",
+    },
+  },
+};
+
+function QuoteFormContent() {
+  const stripe = useStripe();
+  const elements = useElements();
   const [form, setForm] = useState(initialForm);
   const [status, setStatus] = useState({ tone: "", message: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -507,7 +532,7 @@ export default function QuoteForm() {
     });
   }
 
-  function handleReserveRide() {
+  async function handleReserveRide() {
     if (!form.fullName.trim() || !form.phone.trim() || !form.email.trim()) {
       setStatus({
         tone: "warning",
@@ -516,10 +541,10 @@ export default function QuoteForm() {
       return;
     }
 
-    if (!form.cardholderName.trim() || !form.cardNumber.trim() || !form.cardExpiry.trim() || !form.cardCvc.trim() || !form.billingZip.trim()) {
+    if (!form.cardholderName.trim() || !form.billingZip.trim()) {
       setStatus({
         tone: "warning",
-        message: "Please complete the card authorization fields before reserving the ride.",
+        message: "Please complete cardholder name and billing ZIP before reserving the ride.",
       });
       return;
     }
@@ -532,11 +557,73 @@ export default function QuoteForm() {
       return;
     }
 
-    setCurrentStep("authorization");
-    setStatus({
-      tone: "success",
-      message: "Reservation details captured. The next step is the confirmation screen once authorization is connected.",
-    });
+    if (!stripe || !elements) {
+      setStatus({
+        tone: "warning",
+        message: "Secure card authorization is still loading. Please try again in a moment.",
+      });
+      return;
+    }
+
+    const cardElement = elements.getElement(CardElement);
+    if (!cardElement) {
+      setStatus({
+        tone: "error",
+        message: "Secure card field is unavailable. Please refresh the page and try again.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setStatus({ tone: "", message: "" });
+
+    try {
+      const response = await fetch("/api/create-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          form,
+          quote: quoteResult,
+          authorizationAccepted: form.authorizationAccepted,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.clientSecret) {
+        throw new Error(payload?.error || "Unable to start secure payment authorization.");
+      }
+
+      const confirmation = await stripe.confirmCardPayment(payload.clientSecret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: {
+            name: form.cardholderName,
+            email: form.email,
+            phone: form.phone,
+            address: {
+              postal_code: form.billingZip,
+            },
+          },
+        },
+      });
+
+      if (confirmation.error) {
+        throw new Error(confirmation.error.message || "Card authorization failed.");
+      }
+
+      setCurrentStep("authorization");
+      setStatus({
+        tone: "success",
+        message: "Card authorized. Your reservation details are ready for final confirmation.",
+      });
+    } catch (paymentError) {
+      setStatus({
+        tone: "error",
+        message: paymentError instanceof Error ? paymentError.message : "Card authorization failed.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const fieldIcons = {
@@ -555,7 +642,6 @@ export default function QuoteForm() {
     fullName: UserRound,
     flightNumber: Plane,
     cardholderName: UserRound,
-    cardNumber: CreditCard,
     billingZip: MapPin,
   };
 
@@ -806,42 +892,13 @@ export default function QuoteForm() {
                         </div>
                       </label>
                       <label className="quote-cell reservation-grid-span-full">
-                        <span>Card Number</span>
-                        <div className="field-shell">
-                          <input
-                            name="cardNumber"
-                            type="text"
-                            inputMode="numeric"
-                            value={form.cardNumber}
-                            onChange={updateField}
-                            placeholder="1234 1234 1234 1234"
-                          />
-                          <FieldIcon name="cardNumber" />
-                        </div>
-                      </label>
-                      <label className="quote-cell">
-                        <span>Expiration Date</span>
-                        <div className="field-shell">
-                          <input
-                            name="cardExpiry"
-                            type="text"
-                            value={form.cardExpiry}
-                            onChange={updateField}
-                            placeholder="MM / YY"
-                          />
-                        </div>
-                      </label>
-                      <label className="quote-cell">
-                        <span>CVC</span>
-                        <div className="field-shell">
-                          <input
-                            name="cardCvc"
-                            type="text"
-                            inputMode="numeric"
-                            value={form.cardCvc}
-                            onChange={updateField}
-                            placeholder="123"
-                          />
+                        <span>Card Information</span>
+                        <div className="field-shell stripe-card-shell">
+                          {stripePublishableKey ? (
+                            <CardElement options={cardElementOptions} />
+                          ) : (
+                            <span className="stripe-card-unavailable">Stripe publishable key is not configured.</span>
+                          )}
                         </div>
                       </label>
                       <label className="quote-cell reservation-grid-span-full">
@@ -887,8 +944,8 @@ export default function QuoteForm() {
                   <button type="button" className="button dark reservation-secondary-action" onClick={handleEditSearch}>
                     Edit Quote
                   </button>
-                  <button type="button" className="button reservation-continue" onClick={handleReserveRide}>
-                    Reserve the Ride
+                  <button type="button" className="button reservation-continue" onClick={handleReserveRide} disabled={isSubmitting}>
+                    {isSubmitting ? "Authorizing..." : "Reserve the Ride"}
                   </button>
                 </div>
               </div>
@@ -896,12 +953,20 @@ export default function QuoteForm() {
             {currentStep === "authorization" && (
               <div className="authorization-preview" aria-live="polite">
                 <strong>Authorization step is next.</strong>
-                <span>We now have the quote and passenger details saved in session. The next phase is wiring the secure card authorization form and submission flow.</span>
+                <span>Your card authorization was submitted securely through Stripe. EZ Black Car can now review and confirm the ride.</span>
               </div>
             )}
           </section>
         )}
       </div>
     </section>
+  );
+}
+
+export default function QuoteForm() {
+  return (
+    <Elements stripe={stripePromise}>
+      <QuoteFormContent />
+    </Elements>
   );
 }

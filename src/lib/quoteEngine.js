@@ -19,7 +19,11 @@ const airportTerms = [
   "windsor international",
 ];
 
-const mapboxToken = import.meta.env?.VITE_MAPBOX_ACCESS_TOKEN;
+function cleanEnvValue(value) {
+  return String(value || "").replace(/^\uFEFF/, "").trim();
+}
+
+const mapboxToken = cleanEnvValue(import.meta.env?.VITE_MAPBOX_ACCESS_TOKEN);
 const shortNoticeHours = 3;
 
 export const airportOptions = [
