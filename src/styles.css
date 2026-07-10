@@ -1947,8 +1947,25 @@ mapbox-address-autofill {
 
 .authorization-step-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
   grid-column: 1 / -1;
   justify-content: center;
+}
+
+.authorization-lock-note {
+  color: #4b5563;
+  font-size: 13px;
+  grid-column: 1 / -1;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 760px;
+  text-align: center;
+}
+
+.authorization-step-panel > .form-status {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .reservation-action-row {
@@ -2012,6 +2029,50 @@ mapbox-address-autofill {
   font-size: 15px;
   line-height: 1.5;
   margin: 0;
+}
+
+.quote-change-modal {
+  max-width: 560px;
+  width: min(100%, 560px);
+}
+
+.quote-modal-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.quote-modal-field span {
+  color: #07111e;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.quote-modal-field select,
+.quote-modal-field textarea {
+  background: #fff;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  color: #07111e;
+  font: inherit;
+  min-height: 46px;
+  padding: 11px 12px;
+  width: 100%;
+}
+
+.quote-modal-field textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.quote-modal-field small {
+  color: #6b7280;
+  font-size: 11px;
+  justify-self: end;
+}
+
+.quote-change-modal .form-status {
+  margin: 14px 0 0;
 }
 
 .quote-modal-actions {

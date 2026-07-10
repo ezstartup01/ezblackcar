@@ -160,6 +160,10 @@ function QuoteFormContent() {
   const [cardStatus, setCardStatus] = useState({ complete: false, empty: true });
   const [authorizationResult, setAuthorizationResult] = useState(null);
   const [showEditConfirmation, setShowEditConfirmation] = useState(false);
+  const [showChangeRequest, setShowChangeRequest] = useState(false);
+  const [changeRequest, setChangeRequest] = useState({ changeType: "Pickup time", message: "" });
+  const [isSubmittingChangeRequest, setIsSubmittingChangeRequest] = useState(false);
+  const [changeRequestStatus, setChangeRequestStatus] = useState({ tone: "", message: "" });
   const shortNoticeRide = isShortNoticeRide(form);
   const todayValue = getTodayValue();
   const hasAirportTrip = form.pickupType === "airport" || form.destinationType === "airport";
@@ -542,6 +546,76 @@ function QuoteFormContent() {
     }));
   }
 
+  function handleBookNewRide() {
+    setForm(initialForm);
+    setStatus({ tone: "", message: "" });
+    setIsSubmitting(false);
+    setQuoteReady(false);
+    setQuoteResult(null);
+    setCurrentStep("quote");
+    setCardStatus({ complete: false, empty: true });
+    setAuthorizationResult(null);
+    setShowEditConfirmation(false);
+    setShowChangeRequest(false);
+    setChangeRequest({ changeType: "Pickup time", message: "" });
+    setChangeRequestStatus({ tone: "", message: "" });
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  }
+
+  function updateChangeRequest(event) {
+    const { name, value } = event.target;
+    setChangeRequest((current) => ({ ...current, [name]: value }));
+  }
+
+  async function handleSubmitChangeRequest(event) {
+    event.preventDefault();
+
+    if (!changeRequest.changeType || !changeRequest.message.trim()) {
+      setChangeRequestStatus({
+        tone: "warning",
+        message: "Please choose a change type and describe what needs to change.",
+      });
+      return;
+    }
+
+    setIsSubmittingChangeRequest(true);
+    setChangeRequestStatus({ tone: "", message: "" });
+
+    try {
+      const response = await fetch("/api/ride-change-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          form,
+          quote: quoteResult,
+          authorizationResult,
+          quoteRequestId: quoteResult?.quoteRequestId,
+          changeType: changeRequest.changeType,
+          message: changeRequest.message,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to submit change request.");
+      }
+
+      setShowChangeRequest(false);
+      setChangeRequest({ changeType: "Pickup time", message: "" });
+      setChangeRequestStatus({
+        tone: "success",
+        message: payload?.message || "Your change request was received.",
+      });
+    } catch (requestError) {
+      setChangeRequestStatus({
+        tone: "error",
+        message: requestError instanceof Error ? requestError.message : "Unable to submit change request.",
+      });
+    } finally {
+      setIsSubmittingChangeRequest(false);
+    }
+  }
+
   function handleContinueToAuthorization() {
     if (!reservationReady) {
       setStatus({
@@ -869,7 +943,7 @@ function QuoteFormContent() {
                   <h4>Card Authorization Complete</h4>
                   <p>
                     Your card authorization was submitted securely through Stripe. EZ Black Car will review
-                    the trip details and send final confirmation.
+                    the trip details and send final confirmation by email or text.
                   </p>
                 </div>
                 <div className="authorization-step-details" aria-label="Authorization details">
@@ -887,10 +961,20 @@ function QuoteFormContent() {
                   </div>
                 </div>
                 <div className="authorization-step-actions">
-                  <button type="button" className="button dark reservation-secondary-action" onClick={handleEditSearch}>
-                    Edit Quote
+                  <button type="button" className="button dark reservation-secondary-action" onClick={() => setShowChangeRequest(true)}>
+                    Request a Change
+                  </button>
+                  <button type="button" className="button reservation-continue" onClick={handleBookNewRide}>
+                    Book a New Ride
                   </button>
                 </div>
+                <p className="authorization-lock-note">
+                  Submitting a request does not change this trip automatically. EZ Black Car will review it before any price,
+                  timing, availability, or authorization changes are made.
+                </p>
+                {changeRequestStatus.message && (
+                  <p className={`form-status ${changeRequestStatus.tone}`}>{changeRequestStatus.message}</p>
+                )}
               </div>
             ) : (
             <div className="reservation-stage">
@@ -1049,6 +1133,58 @@ function QuoteFormContent() {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+            {showChangeRequest && (
+              <div className="quote-modal-backdrop" role="presentation">
+                <form className="quote-modal quote-change-modal" role="dialog" aria-modal="true" aria-labelledby="change-request-title" onSubmit={handleSubmitChangeRequest}>
+                  <h4 id="change-request-title">Request a Trip Change</h4>
+                  <p>
+                    Tell us what changed. This request will be reviewed before your reservation, pricing,
+                    or authorization is updated.
+                  </p>
+                  <label className="quote-modal-field">
+                    <span>Change Type</span>
+                    <select name="changeType" value={changeRequest.changeType} onChange={updateChangeRequest}>
+                      <option>Pickup time</option>
+                      <option>Pickup location</option>
+                      <option>Destination</option>
+                      <option>Passenger or luggage count</option>
+                      <option>Flight details</option>
+                      <option>Medical or emergency situation</option>
+                      <option>Other</option>
+                    </select>
+                  </label>
+                  <label className="quote-modal-field">
+                    <span>What needs to change?</span>
+                    <textarea
+                      name="message"
+                      value={changeRequest.message}
+                      onChange={updateChangeRequest}
+                      maxLength={600}
+                      placeholder="Example: Passenger is experiencing a medical emergency and we need to move pickup earlier."
+                    />
+                    <small>{changeRequest.message.length}/600</small>
+                  </label>
+                  {changeRequestStatus.message && (
+                    <p className={`form-status ${changeRequestStatus.tone}`}>{changeRequestStatus.message}</p>
+                  )}
+                  <div className="quote-modal-actions">
+                    <button
+                      type="button"
+                      className="button quote-modal-cancel"
+                      onClick={() => {
+                        setShowChangeRequest(false);
+                        setChangeRequestStatus({ tone: "", message: "" });
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button type="submit" className="button dark quote-modal-confirm" disabled={isSubmittingChangeRequest}>
+                      {isSubmittingChangeRequest ? "Submitting..." : "Submit Request"}
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
           </section>
