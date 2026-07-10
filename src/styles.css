@@ -222,6 +222,7 @@ mapbox-address-autofill {
 .button {
   align-items: center;
   border-radius: 5px;
+  cursor: pointer;
   display: inline-flex;
   font-size: 14px;
   font-weight: 900;
@@ -231,6 +232,11 @@ mapbox-address-autofill {
   padding: 0 25px;
   text-decoration: none;
   text-transform: uppercase;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .button.secondary {
@@ -1842,21 +1848,107 @@ mapbox-address-autofill {
 }
 
 .reservation-continue {
+  background: linear-gradient(180deg, var(--gold-2), var(--gold));
+  border: 1px solid rgba(80, 48, 0, 0.26);
+  color: #fff;
   min-height: 50px;
   min-width: min(100%, 280px);
   width: auto;
 }
 
-.authorization-preview {
-  align-items: flex-start;
-  background: #eef7ef;
-  border: 1px solid #b9d9bd;
+.reservation-continue:hover:not(:disabled),
+.reservation-continue:focus-visible:not(:disabled) {
+  background: linear-gradient(180deg, #d7a545, #a87418);
+  color: #fff;
+}
+
+.authorization-step-panel {
+  align-items: center;
+  background: #fffaf1;
+  border: 1px solid rgba(190, 132, 33, 0.28);
   border-radius: 8px;
-  color: #22532a;
   display: grid;
-  gap: 6px;
+  gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr);
   margin-top: 18px;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.authorization-step-icon {
+  align-items: center;
+  background: #07111e;
+  border-radius: 999px;
+  color: var(--gold-2);
+  display: inline-flex;
+  height: 58px;
+  justify-content: center;
+  width: 58px;
+}
+
+.authorization-step-copy {
+  min-width: 0;
+}
+
+.authorization-step-kicker {
+  color: var(--gold);
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.authorization-step-copy h4 {
+  color: #07111e;
+  font-size: clamp(22px, 2.6vw, 32px);
+  line-height: 1.1;
+  margin: 0 0 8px;
+}
+
+.authorization-step-copy p {
+  color: #374151;
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 780px;
+}
+
+.authorization-step-details {
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.authorization-step-details div {
+  background: #fff;
+  border: 1px solid rgba(7, 17, 30, 0.09);
+  border-radius: 7px;
+  min-width: 0;
   padding: 14px 16px;
+}
+
+.authorization-step-details span {
+  color: #6b7280;
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.authorization-step-details strong {
+  color: #07111e;
+  display: block;
+  font-size: 18px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.authorization-step-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: center;
 }
 
 .reservation-action-row {
@@ -1867,6 +1959,7 @@ mapbox-address-autofill {
 }
 
 .reservation-action-row .button {
+  color: #fff;
   font-size: 14px;
   font-weight: 900;
   min-height: 50px;
@@ -1874,16 +1967,73 @@ mapbox-address-autofill {
 }
 
 .reservation-secondary-action {
+  border: 1px solid rgba(223, 179, 90, 0.34);
+  color: #fff;
   min-width: min(100%, 280px);
 }
 
-.authorization-preview strong {
-  font-size: 14px;
+.reservation-secondary-action:hover:not(:disabled),
+.reservation-secondary-action:focus-visible:not(:disabled) {
+  background: #132338;
+  border-color: var(--gold-2);
+  color: #fff;
 }
 
-.authorization-preview span {
-  font-size: 13px;
+.quote-modal-backdrop {
+  align-items: center;
+  background: rgba(7, 17, 30, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 22px;
+  position: fixed;
+  z-index: 120;
+}
+
+.quote-modal {
+  background: #fff;
+  border: 1px solid rgba(223, 179, 90, 0.36);
+  border-radius: 9px;
+  box-shadow: 0 24px 70px rgba(7, 17, 30, 0.32);
+  max-width: 460px;
+  padding: 24px;
+  width: min(100%, 460px);
+}
+
+.quote-modal h4 {
+  color: #07111e;
+  font-size: 24px;
+  line-height: 1.15;
+  margin: 0 0 10px;
+}
+
+.quote-modal p {
+  color: #374151;
+  font-size: 15px;
   line-height: 1.5;
+  margin: 0;
+}
+
+.quote-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+.quote-modal-cancel {
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  color: #07111e;
+}
+
+.quote-modal-cancel:hover,
+.quote-modal-cancel:focus-visible {
+  background: #e5e7eb;
+}
+
+.quote-modal-confirm {
+  color: #fff;
 }
 
 .trustbar {
@@ -3042,6 +3192,10 @@ mapbox-address-autofill {
     flex-direction: column;
   }
 
+  .authorization-step-details {
+    grid-template-columns: 1fr;
+  }
+
   .reservation-grid-span-full {
     grid-column: 1 / -1;
   }
@@ -3370,6 +3524,24 @@ mapbox-address-autofill {
 
   .reservation-grid-contact {
     grid-template-columns: 1fr;
+  }
+
+  .authorization-step-panel {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+
+  .authorization-step-actions,
+  .authorization-step-actions .button {
+    width: 100%;
+  }
+
+  .quote-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .quote-modal-actions .button {
+    width: 100%;
   }
 
 

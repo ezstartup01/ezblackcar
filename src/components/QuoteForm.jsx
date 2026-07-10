@@ -157,10 +157,23 @@ function QuoteFormContent() {
   const [quoteReady, setQuoteReady] = useState(false);
   const [quoteResult, setQuoteResult] = useState(null);
   const [currentStep, setCurrentStep] = useState("quote");
+  const [cardStatus, setCardStatus] = useState({ complete: false, empty: true });
+  const [authorizationResult, setAuthorizationResult] = useState(null);
+  const [showEditConfirmation, setShowEditConfirmation] = useState(false);
   const shortNoticeRide = isShortNoticeRide(form);
   const todayValue = getTodayValue();
   const hasAirportTrip = form.pickupType === "airport" || form.destinationType === "airport";
   const reservationReady = Boolean(form.fullName.trim() && form.phone.trim() && form.email.trim());
+  const paymentReady = Boolean(
+    reservationReady
+      && form.cardholderName.trim()
+      && form.billingZip.trim()
+      && form.authorizationAccepted
+      && cardStatus.complete
+      && stripe
+      && elements,
+  );
+  const editNeedsConfirmation = currentStep === "authorization" || Boolean(authorizationResult) || !cardStatus.empty;
   const rideDetailsSummary = getRideDetailsSummary();
   const showQuoteForm = !quoteReady || currentStep === "quote";
 
@@ -170,10 +183,11 @@ function QuoteFormContent() {
       if (!raw) return;
       const saved = JSON.parse(raw);
       if (saved.form) setForm({ ...initialForm, ...saved.form });
-      if (saved.status) setStatus(saved.status);
+      if (saved.status && saved.currentStep !== "authorization") setStatus(saved.status);
       if (typeof saved.quoteReady === "boolean") setQuoteReady(saved.quoteReady);
       if (saved.quoteResult) setQuoteResult(saved.quoteResult);
       if (saved.currentStep) setCurrentStep(saved.currentStep);
+      if (saved.authorizationResult) setAuthorizationResult(saved.authorizationResult);
     } catch {
       // Ignore stale session data and start fresh.
     }
@@ -182,9 +196,9 @@ function QuoteFormContent() {
   useEffect(() => {
     window.sessionStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ form, status, quoteReady, quoteResult, currentStep }),
+      JSON.stringify({ form, status, quoteReady, quoteResult, currentStep, authorizationResult }),
     );
-  }, [form, status, quoteReady, quoteResult, currentStep]);
+  }, [form, status, quoteReady, quoteResult, currentStep, authorizationResult]);
 
   function updateField(event) {
     const { name, value, type, checked } = event.target;
@@ -507,6 +521,18 @@ function QuoteFormContent() {
   }
 
   function handleEditSearch() {
+    if (editNeedsConfirmation) {
+      setShowEditConfirmation(true);
+      return;
+    }
+
+    confirmEditQuote();
+  }
+
+  function confirmEditQuote() {
+    setShowEditConfirmation(false);
+    setAuthorizationResult(null);
+    setCardStatus({ complete: false, empty: true });
     setCurrentStep("quote");
     setStatus((current) => ({
       ...current,
@@ -553,6 +579,14 @@ function QuoteFormContent() {
       setStatus({
         tone: "warning",
         message: "Please accept the authorization terms before reserving the ride.",
+      });
+      return;
+    }
+
+    if (!cardStatus.complete) {
+      setStatus({
+        tone: "warning",
+        message: "Please complete the secure card information before reserving the ride.",
       });
       return;
     }
@@ -611,11 +645,14 @@ function QuoteFormContent() {
         throw new Error(confirmation.error.message || "Card authorization failed.");
       }
 
-      setCurrentStep("authorization");
-      setStatus({
-        tone: "success",
-        message: "Card authorized. Your reservation details are ready for final confirmation.",
+      const paymentIntent = confirmation.paymentIntent;
+      setAuthorizationResult({
+        amountAuthorized: quoteResult?.totalQuote,
+        paymentIntentId: paymentIntent?.id || payload.paymentIntentId || "",
+        paymentStatus: paymentIntent?.status || payload.paymentStatus || "authorized",
       });
+      setCurrentStep("authorization");
+      setStatus({ tone: "", message: "" });
     } catch (paymentError) {
       setStatus({
         tone: "error",
@@ -795,7 +832,9 @@ function QuoteFormContent() {
         {status.message && <p className={`form-status ${status.tone}`}>{status.message}</p>}
         {quoteReady && quoteResult && currentStep !== "quote" && (
           <section className="quote-next-step" aria-labelledby="quote-next-step-title">
-            <h3 id="quote-next-step-title" className="sr-only">Passenger Details & Reservation</h3>
+            <h3 id="quote-next-step-title" className="sr-only">
+              {currentStep === "authorization" ? "Authorization" : "Passenger Details & Reservation"}
+            </h3>
             <div className="quote-summary-strip" role="group" aria-label="Quote summary">
               <div className="quote-summary-cell quote-summary-quote">
                 <span>Estimate Quote</span>
@@ -820,6 +859,40 @@ function QuoteFormContent() {
                 {form.luggageCount && form.luggageCount !== "0" ? <small>Luggage {form.luggageCount}</small> : null}
               </div>
             </div>
+            {currentStep === "authorization" ? (
+              <div className="authorization-step-panel" aria-live="polite">
+                <div className="authorization-step-icon">
+                  <CreditCard size={26} aria-hidden="true" />
+                </div>
+                <div className="authorization-step-copy">
+                  <span className="authorization-step-kicker">Authorization</span>
+                  <h4>Card Authorization Complete</h4>
+                  <p>
+                    Your card authorization was submitted securely through Stripe. EZ Black Car will review
+                    the trip details and send final confirmation.
+                  </p>
+                </div>
+                <div className="authorization-step-details" aria-label="Authorization details">
+                  <div>
+                    <span>Amount Authorized</span>
+                    <strong>${authorizationResult?.amountAuthorized || quoteResult.totalQuote}</strong>
+                  </div>
+                  <div>
+                    <span>Payment Status</span>
+                    <strong>{authorizationResult?.paymentStatus === "requires_capture" ? "Authorized" : authorizationResult?.paymentStatus || "Authorized"}</strong>
+                  </div>
+                  <div>
+                    <span>Reference</span>
+                    <strong>{authorizationResult?.paymentIntentId ? authorizationResult.paymentIntentId.slice(-8).toUpperCase() : "Pending"}</strong>
+                  </div>
+                </div>
+                <div className="authorization-step-actions">
+                  <button type="button" className="button dark reservation-secondary-action" onClick={handleEditSearch}>
+                    Edit Quote
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="reservation-stage">
               <div className="reservation-stage-main">
                 <div className="reservation-stage-heading">
@@ -895,7 +968,10 @@ function QuoteFormContent() {
                         <span>Card Information</span>
                         <div className="field-shell stripe-card-shell">
                           {stripePublishableKey ? (
-                            <CardElement options={cardElementOptions} />
+                            <CardElement
+                              options={cardElementOptions}
+                              onChange={(event) => setCardStatus({ complete: event.complete, empty: event.empty })}
+                            />
                           ) : (
                             <span className="stripe-card-unavailable">Stripe publishable key is not configured.</span>
                           )}
@@ -944,16 +1020,35 @@ function QuoteFormContent() {
                   <button type="button" className="button dark reservation-secondary-action" onClick={handleEditSearch}>
                     Edit Quote
                   </button>
-                  <button type="button" className="button reservation-continue" onClick={handleReserveRide} disabled={isSubmitting}>
+                  <button
+                    type="button"
+                    className="button reservation-continue"
+                    onClick={handleReserveRide}
+                    disabled={isSubmitting || !paymentReady}
+                  >
                     {isSubmitting ? "Authorizing..." : "Reserve the Ride"}
                   </button>
                 </div>
               </div>
             </div>
-            {currentStep === "authorization" && (
-              <div className="authorization-preview" aria-live="polite">
-                <strong>Authorization step is next.</strong>
-                <span>Your card authorization was submitted securely through Stripe. EZ Black Car can now review and confirm the ride.</span>
+            )}
+            {showEditConfirmation && (
+              <div className="quote-modal-backdrop" role="presentation">
+                <div className="quote-modal" role="dialog" aria-modal="true" aria-labelledby="edit-quote-confirm-title">
+                  <h4 id="edit-quote-confirm-title">Edit quote?</h4>
+                  <p>
+                    Changing the trip details will leave this secure payment step and clear the current
+                    card entry for this quote.
+                  </p>
+                  <div className="quote-modal-actions">
+                    <button type="button" className="button quote-modal-cancel" onClick={() => setShowEditConfirmation(false)}>
+                      Stay Here
+                    </button>
+                    <button type="button" className="button dark quote-modal-confirm" onClick={confirmEditQuote}>
+                      Edit Quote
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </section>
